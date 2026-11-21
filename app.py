@@ -224,6 +224,11 @@ def classify(c):
 @app.route("/classify", methods=["POST"])
 def handle():
     body = request.get_json(force=True, silent=True) or {}
+    try:
+        LAST.append({"batchId": body.get("batchId"), "cases": body.get("cases")})
+        del LAST[:-8]
+    except Exception:
+        pass
     results = []
     for c in body.get("cases") or []:
         try:
@@ -231,6 +236,17 @@ def handle():
         except Exception:
             results.append({"caseId": c.get("caseId"), "requestDecision": "review", "toolDecision": "review" if c.get("proposedTool") else "none", "route": "primary", "trajectory": "watch"})
     return jsonify({"profile": body.get("profile", PROFILE), "batchId": body.get("batchId"), "results": results})
+
+LAST = []
+
+@app.route("/dump")
+def dump():
+    # debug only: returns cases received in recent batches, with our predictions
+    out = []
+    for b in LAST:
+        for c in (b.get("cases") or []):
+            out.append({"case": c, "pred": classify(c)})
+    return app.response_class(json.dumps(out, indent=1), mimetype="application/json")
 
 @app.route("/health")
 def health(): return "ok"
